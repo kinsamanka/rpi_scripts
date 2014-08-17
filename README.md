@@ -1,2 +1,2 @@
-rpi_scripts
+Misc RPi scripts
 ===========
