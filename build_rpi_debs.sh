@@ -16,7 +16,7 @@ http://deb.dovetail-automata.com/pool/main/x/xenomai/
 
 CYTHON_LINK='http://cdn.debian.net/debian/pool/main/c/cython/cython_0.19.1+git34-gac3e3a2-1~bpo70+1.dsc'
 
-MIRROR='http://mirror.nus.edu.sg/raspbian/raspbian'
+MIRROR='http://mirrordirector.raspbian.org/raspbian/'
 
 DSCDIR="`pwd`/src_files"
 
