@@ -1,7 +1,7 @@
 #!/bin/sh
 
 DIST=wheezy
-NUM_CORES=4
+NUM_CORES=3
 
 LINKS='
 http://deb.dovetail-automata.com/pool/main/libs/libsodium/
@@ -16,7 +16,7 @@ http://deb.dovetail-automata.com/pool/main/x/xenomai/
 
 CYTHON_LINK='http://cdn.debian.net/debian/pool/main/c/cython/cython_0.19.1+git34-gac3e3a2-1~bpo70+1.dsc'
 
-MIRROR='http://mirrordirector.raspbian.org/raspbian/'
+MIRROR='http://mirrordirector.raspbian.org/raspbian'
 
 DSCDIR="`pwd`/src_files"
 
@@ -26,18 +26,11 @@ BASEPATH="${BASEPATHROOT}/base.cow"
 BUILDRESULT="`pwd`/result"
 HOOKDIR="`pwd`/hooks"
 APTCACHE="`pwd`/aptcache"
-CCACHEDIR="`pwd`/ccache"
 
 BINDMOUNTS="${BUILDRESULT}"
 EXTRAPACKAGES="apt-utils"
 DEBBUILDOPTS="-I -i -j${NUM_CORES}"
 OTHERMIRROR="deb [trusted=yes] file://${BUILDRESULT} ./"
-
-COWBUILDER_OPTIONS="\
-  BUILDPLACE=${BUILDPLACE} BASEPATH=${BASEPATH} BUILDRESULT=${BUILDRESULT}\
-  HOOKDIR=${HOOKDIR} APTCACHE=${APTCACHE} CCACHEDIR=${CCACHEDIR}\
-  BINDMOUNTS=${BINDMOUNTS} EXTRAPACKAGES=${EXTRAPACKAGES}\
-  "
 
 install_cowbuilder() {
   # check if running on arm
@@ -64,19 +57,27 @@ setup_cowbuilder() {
   dpkg -i raspbian-archive-keyring_20120528.2_all.deb
   rm raspbian-archive-keyring_20120528.2_all.deb
 
-  mkdir -p ${BUILDPLACE}
-  mkdir -p ${BASEPATHROOT}
-  mkdir -p ${BUILDRESULT}
-  mkdir -p ${HOOKDIR}
   mkdir -p ${APTCACHE}
-  mkdir -p ${CCACHEDIR}
+  mkdir -p ${BASEPATHROOT}
+  mkdir -p ${BUILDPLACE}
+  mkdir -p ${BUILDRESULT}
   mkdir -p ${DSCDIR}
+  mkdir -p ${HOOKDIR}
 
   # create pbuilderrc
   a=`pwd`/.pbuilderrc
   cat <<EOF > ${a}
-APTCACHE=${APTCACHE}
+APTCACHE="${APTCACHE}"
 APTCACHEHARDLINK="yes"
+BASEPATH="${BASEPATH}"
+BINDMOUNTS="${BINDMOUNTS}"
+BUILDPLACE="${BUILDPLACE}"
+BUILDRESULT="${BUILDRESULT}"
+DEBBUILDOPTS="${DEBBUILDOPTS}"
+DISTRIBUTION="${DIST}"
+EXTRAPACKAGES="${EXTRAPACKAGES}"
+HOOKDIR="${HOOKDIR}"
+OTHERMIRROR="deb [trusted=yes] file://${BUILDRESULT} ./"
 EOF
 
   # create hooks
@@ -85,14 +86,19 @@ EOF
 apt-get update
 EOF
   chmod +x ${HOOKDIR}/D05Deps
+  
+  # create temporaty Packages file, otherwise cowbuilder fails
+  cat <<EOF > ${BUILDRESULT}/Packages
+Package: test-doc
+EOF
 
-  env ${COWBUILDER_OPTIONS} HOME=`pwd` cowbuilder --create \
+  HOME=`pwd` cowbuilder --create \
   --distribution ${DIST} \
   --mirror ${MIRROR} \
   --components "main contrib non-free rpi" \
   --debootstrapopts \
   --keyring=/usr/share/keyrings/raspbian-archive-keyring.gpg \
-  ${EXTRAS}
+  ${EXTRAS} || exit 1
 }
 
 # get dsc files from $LINKS
@@ -127,7 +133,7 @@ then
 fi
 
 # update
-env ${COWBUILDER_OPTIONS} HOME=`pwd` cowbuilder --update
+HOME=`pwd` cowbuilder --update
 
 # download source files
 SRC=
@@ -144,12 +150,10 @@ done
 
 # build packages
 # start with cython first
-env ${COWBUILDER_OPTIONS} DEBBUILDOPTS="${DEBBUILDOPTS}" \
-  OTHERMIRROR="${OTHERMIRROR}" HOME=`pwd` cowbuilder --build ${DSCDIR}/cython*dsc
+HOME=`pwd` cowbuilder --build ${DSCDIR}/cython*dsc || exit 1
 
 # then the rest
 for a in ${SRC}
 do
-  env ${COWBUILDER_OPTIONS} DEBBUILDOPTS="${DEBBUILDOPTS}" \
-    OTHERMIRROR="${OTHERMIRROR}" HOME=`pwd` cowbuilder --build ${DSCDIR}/${a}
+  HOME=`pwd` cowbuilder --build ${DSCDIR}/${a} || exit 1
 done
